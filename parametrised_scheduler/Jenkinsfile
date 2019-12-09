@@ -1,0 +1,22 @@
+#!/usr/bin/env groovy
+
+// Not all params need to be defined if defaults are present
+// Spaces are fine and any variables will be trimmed
+properties([parameters([
+              string(defaultValue: 'bed', description: 'Furniture to describe', name: 'furniture', trim: true),
+              string(defaultValue: 'white', description: 'Color of the object', name: 'color', trim: true),
+              string(defaultValue: 'nobody', description: 'Who it belongs to', name: 'name', trim: true)
+            ]),
+            pipelineTriggers([
+              parameterizedCron(
+'''5 * * * * % furniture=chair;color=black
+10 * * * * % furniture=desk; color=yellow; name=barney'''
+              )
+            ])
+          ])
+
+stage("Process the build") {
+
+  echo params.name + " says that the " + params.furniture + " is the color " + params.color
+
+}

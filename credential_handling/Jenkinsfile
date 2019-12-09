@@ -1,0 +1,54 @@
+#!/usr/bin/env groovy
+
+/*
+Description:
+This Jenkinsfile demonstrates requesting a credential from the Jenkins master and then making use of it
+*/
+
+node {
+  stage('using user/pass variables') {
+    // the withCredentials wrapper is told to use a user/password pair
+    // these do get exported to the environment so no need to pass in with env.FOO steps
+    // also try to avoid any variable names that might then clash with the environment
+    withCredentials([usernamePassword( credentialsId: 'fake_example_cred_up_id',
+        usernameVariable: 'my_user', passwordVariable: 'my_pass')]) {
+
+      sh "echo uname=${my_user} pwd=${my_pass}"
+      sh "test '${my_user}' == 'fake_example_user'"
+      sh "test '${my_pass}' == 'fake_example_pass'"
+    }
+  }
+
+  stage('using text variables') {
+    // the withCredentials wrapper is told to use a secret text
+    // this do get exported to the environment so no need to pass in with env.FOO steps
+    // also try to avoid any variable names that might then clash with the environment
+    withCredentials([string( credentialsId: 'fake_example_cred_text_id', variable: 'my_secret_text')]) {
+      sh "echo ${my_secret_text}"
+    }
+  }
+  stage('using a secret file') {
+    // This time the withCredentials wrapper is calling on a secret file to be placed in the workspace
+    // Be careful with this and avoid accidentally stashing it or pushing it
+    // The file will automatically be removed when the build finishes
+    withCredentials([file(credentialsId: 'fake_example_secret_file_test', variable: 'mysecretfile')]) {
+      sh "ls -l  ${mysecretfile}"
+      sh "grep 'placeholder' ${mysecretfile}"
+    }
+
+  }
+
+  stage('using an ssh key') {
+  // this is just a special case of using a secret file
+  // the key gets placed and removed automatically by jenkins
+    withCredentials([file(credentialsId: 'fake_example_secret_file_test', variable: 'mysshkey')]) {
+      sh "echo 'ssh -i ${mysshkey} <myhostname> <mycommand>'"
+      // Or more likely using a docker image to deploy
+      // sh "docker run {someimage}"
+      // sh "docker cp ${mysshkey} {someimage}:/root/.ssh/"
+      // sh "docker exec {someimage} make deploy"
+      // sh "docker rm {someimage}"
+    }
+  }
+
+}

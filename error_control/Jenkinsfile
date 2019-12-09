@@ -1,0 +1,27 @@
+#!/usr/bin/env groovy
+
+docker_tag = "node_${BUILD_NUMBER}"
+
+node() {
+
+  // For some things error handling should be used for cleanup
+  stage('Bad stage') {
+    try {
+      sh "docker run -dt --name $docker_tag centos:latest cat"
+      sh "docker exec $docker_tag /bin/false"
+    } catch(err) {
+      // Need to set the build result as the catch will mask the failure otherwise
+      echo "Got bad result"
+      // use unstable for now to reflect a not fully failed build until per stage status possible
+      currentBuild.result = "UNSTABLE"
+    } finally {
+      // Always clear up regardless of the result
+      sh "docker stop $docker_tag"
+      sh "docker rm $docker_tag"
+    }
+  }
+  stage('Good stage') {
+    sh '/bin/true'
+    // until https://issues.jenkins-ci.org/browse/JENKINS-26522 is resolved cannot display per stage failure, only overall
+  }
+}

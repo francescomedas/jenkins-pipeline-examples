@@ -1,0 +1,49 @@
+#!/usr/bin/env groovy
+
+stage('always run') {
+  node() {
+    sh 'echo always run'
+
+    // grab the current tag if it exists
+    env.GIT_TAG = 'undefined'
+    
+    sh "echo placeholder >> sample.txt"
+
+    stash 'source'
+  }
+}
+
+stage('run when a tag is defined') {
+  if (env.GIT_TAG != 'undefined') {
+    node {
+      unstash 'source'
+      sh 'echo running in tag $GIT_TAG'
+    }
+  }
+}
+
+stage('run when branch name matches feature/.*') {
+  if (env.BRANCH_NAME ==~ /feature\/.*/) {
+    node {
+      unstash 'source'
+      sh "echo running in feature branch $BRANCH_NAME"
+    }
+  }
+}
+
+stage('run when the user confirms') {
+  // an expired timeout causes an error, instead of a 'FAILED'
+  // result, return 'ABORTED'
+  try {
+    timeout(time: 60, unit: 'MINUTES') {
+      input 'proceed?'
+    }
+    node {
+      unstash 'source'
+      sh "echo deploying!"
+    }
+  } catch(err) {
+    echo "No input provided, deploy aborted"
+    currentBuild.result = "ABORTED"
+  }
+}

@@ -1,0 +1,115 @@
+#!/usr/bin/env groovy
+
+/*
+Description:
+This Jenkinsfile demonstrates checking the reason for the build and acting
+on that to ensure a manual action if required.
+*/
+
+stage('basic interaction request') {
+  timeout(time: 60) {
+    input message: "Proceed with jenkinsfile?"
+  }
+}
+
+// note that when using an input step with a single parameter the name is ignored and the response is returned
+stage('multiple choice iteraction') {
+  // define it out of the block for scope reasons
+  def approval
+
+  // Don't have an interaction waiting for more than 60 minutes
+    timeout(time: 60) {
+      // don't use up a node executor for input, ensure it is outside of node(){}
+
+      // choices no longer need to be a \n delimited string - see https://issues.jenkins-ci.org/browse/JENKINS-26143
+      // leaving this one in this format so that we can regression test existing code
+      // the first in the \n delimited list is the default behaviour
+
+        approval = input(message: 'Proceed with action?', parameters: [choice(choices: 'no\nyes\nquestions scare me', description: '', name: '')])
+    }
+
+  // now do whatever is needed in the node
+  node {
+    if (approval == 'yes') {
+      echo "wow you actually said ${approval}"
+    } else {
+      echo "It's a shame you said \"${approval}\""
+    }
+  }
+}
+
+stage('request a string interaction') {
+  def foo
+  timeout(time: 60) {
+    foo = input message: 'testing', parameters: [string(defaultValue: 'bar', description: '', name: '')]
+  }
+
+  node {
+    echo foo
+  }
+}
+
+stage('record clicking user') {
+  def bar
+  timeout(time: 60) {
+    // note, 'user' could be anything, it isn't actually used when the only 'parameter' we request is the submitter
+    bar = input message: 'Who dares click proceed?', submitterParameter: 'user'
+  }
+
+  node {
+    echo "${bar} is a brave person indeed."
+  }
+}
+
+stage('request a boolean choice') {
+  def baz
+  timeout(time: 60) {
+    baz = input message: 'This is a lie, true or false?', parameters: [booleanParam(defaultValue: true, description: '', name: '')]
+  }
+
+  node {
+    echo "If really ${baz}, then it cannot be ${baz}!"
+  }
+}
+
+// If uploading a file then a workspace is needed to upload into
+// This means this has to take an executor so be sensible!
+stage('request a file with predetermined filename') {
+  node {
+    deleteDir()
+    uploaded_file = inputGetFile('my-file-here')
+    sh "file '${uploaded_file}'"
+    sh "ls -la ."
+  }
+}
+
+stage('request a file with user-defined filename') {
+  node {
+    deleteDir()
+    uploaded_file = inputGetFile()
+    sh "file '${uploaded_file}'"
+    sh "ls -la ."
+  }
+}
+
+// NOTE: this function requires signatures to be whitelisted
+def inputGetFile(String savedfile = null) {
+    def filedata = null
+    def filename = null
+    // Get file using input step, will put it in build directory
+    // the filename will not be included in the upload data, so optionally allow it to be specified
+    if (savedfile == null) {
+      def inputFile = input message: 'Upload file', parameters: [file(name: 'data_upload'), string(name: 'filename', defaultValue: 'uploaded-file-data')]
+      filedata = inputFile['data_upload']
+      filename = inputFile['filename']
+    } else {
+      def inputFile = input message: 'Upload file', parameters: [file(name: 'data_upload')]
+      filedata = inputFile
+      filename = savedfile
+    }
+    // Read contents and write to workspace
+    writeFile(file: filename, encoding: 'Base64', text: filedata.read().getBytes().encodeBase64().toString())
+    // Remove the file from the master to avoid stuf flike secret leakage
+    filedata.delete()
+    return filename
+}
